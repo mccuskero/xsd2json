@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "http://example.com/master",
+  "title": "Master Schema",
+  "type": "object",
+  "properties": {
+    "exampleType": {
+      "$ref": "types/example-type.json"
+    }
+  }
+}

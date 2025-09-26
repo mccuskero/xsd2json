@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://example.com/inheritance"
+           xmlns:tns="http://example.com/inheritance"
+           elementFormDefault="qualified">
+
+    <!-- Base type -->
+    <xs:complexType name="BasePersonType">
+        <xs:annotation>
+            <xs:documentation>Base person type with core attributes</xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="id" type="xs:string"/>
+            <xs:element name="name" type="xs:string"/>
+        </xs:sequence>
+        <xs:attribute name="version" type="xs:string" use="optional"/>
+    </xs:complexType>
+
+    <!-- Extension of base type -->
+    <xs:complexType name="ExtendedPersonType">
+        <xs:annotation>
+            <xs:documentation>Extended person type with additional information</xs:documentation>
+        </xs:annotation>
+        <xs:complexContent>
+            <xs:extension base="tns:BasePersonType">
+                <xs:sequence>
+                    <xs:element name="email" type="xs:string" minOccurs="0"/>
+                    <xs:element name="phone" type="xs:string" minOccurs="0"/>
+                </xs:sequence>
+                <xs:attribute name="priority" type="xs:int" use="optional"/>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+
+    <!-- Deep extension (3 levels) -->
+    <xs:complexType name="EmployeeType">
+        <xs:annotation>
+            <xs:documentation>Employee type extending person with work information</xs:documentation>
+        </xs:annotation>
+        <xs:complexContent>
+            <xs:extension base="tns:ExtendedPersonType">
+                <xs:sequence>
+                    <xs:element name="employeeId" type="xs:string"/>
+                    <xs:element name="department" type="xs:string"/>
+                    <xs:element name="salary" type="xs:decimal" minOccurs="0"/>
+                </xs:sequence>
+                <xs:attribute name="isManager" type="xs:boolean" default="false"/>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+
+    <!-- Restriction example -->
+    <xs:complexType name="RestrictedPersonType">
+        <xs:annotation>
+            <xs:documentation>Restricted person type with limited attributes</xs:documentation>
+        </xs:annotation>
+        <xs:complexContent>
+            <xs:restriction base="tns:BasePersonType">
+                <xs:sequence>
+                    <xs:element name="id" type="xs:string"/>
+                    <xs:element name="name" type="xs:string"/>
+                </xs:sequence>
+                <!-- version attribute removed through restriction -->
+            </xs:restriction>
+        </xs:complexContent>
+    </xs:complexType>
+
+    <!-- Elements using these types -->
+    <xs:element name="basePerson" type="tns:BasePersonType"/>
+    <xs:element name="extendedPerson" type="tns:ExtendedPersonType"/>
+    <xs:element name="employee" type="tns:EmployeeType"/>
+    <xs:element name="restrictedPerson" type="tns:RestrictedPersonType"/>
+
+</xs:schema>
