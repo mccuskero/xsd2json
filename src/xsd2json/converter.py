@@ -156,32 +156,55 @@ class Converter:
 
         return json_schemas
 
-    def _extract_properties_from_particle(self, particle) -> Dict[str, Any]:
-        """Extract properties from a particle with better sequence/choice/all handling."""
+    def _extract_properties_from_particle(self, particle) -> tuple[Dict[str, Any], List[str]]:
+        """Extract properties and required elements from a particle with better sequence/choice/all handling."""
         properties = {}
+        required_elements = []
 
         if not particle:
-            return properties
+            return properties, required_elements
 
         # Handle different particle types
         if hasattr(particle, 'particles') and particle.particles:
             # This is a model group (sequence, choice, all)
+            particle_type = type(particle).__name__
+
             for child_particle in particle.particles:
                 if hasattr(child_particle, 'name') and child_particle.name:
                     # This is an element
                     element_schema = self._create_element_schema(child_particle)
                     properties[child_particle.name] = element_schema
+
+                    # For xs:all elements, if minOccurs >= 1, make them required
+                    # For sequence/choice, check individual element minOccurs
+                    if 'All' in particle_type:
+                        # xs:all - all elements with minOccurs >= 1 are required
+                        if hasattr(child_particle, 'occurs') and hasattr(child_particle.occurs, 'min'):
+                            if child_particle.occurs.min >= 1:
+                                required_elements.append(child_particle.name)
+                    else:
+                        # sequence/choice - check individual element requirements
+                        if hasattr(child_particle, 'occurs') and hasattr(child_particle.occurs, 'min'):
+                            if child_particle.occurs.min >= 1:
+                                required_elements.append(child_particle.name)
+
                 elif hasattr(child_particle, 'particles'):
                     # Nested model group - recurse
-                    nested_properties = self._extract_properties_from_particle(child_particle)
+                    nested_properties, nested_required = self._extract_properties_from_particle(child_particle)
                     properties.update(nested_properties)
+                    required_elements.extend(nested_required)
 
         elif hasattr(particle, 'name') and particle.name:
             # This is a single element
             element_schema = self._create_element_schema(particle)
             properties[particle.name] = element_schema
 
-        return properties
+            # Check if this single element is required
+            if hasattr(particle, 'occurs') and hasattr(particle.occurs, 'min'):
+                if particle.occurs.min >= 1:
+                    required_elements.append(particle.name)
+
+        return properties, required_elements
 
     def _create_element_schema(self, element) -> Dict[str, Any]:
         """Create JSON schema for a single element."""
@@ -523,8 +546,38 @@ class Converter:
         if xsd_type.annotation and xsd_type.annotation.documentation:
             json_schema["description"] = " ".join(xsd_type.annotation.documentation)
 
+        # Check for enumerations FIRST (before inheritance) since enum types also have base_type
+        if hasattr(xsd_type, 'facets') and xsd_type.facets:
+            # Handle enumeration facets - facets can be dict or list depending on parser
+            enumeration_values = []
+
+            if isinstance(xsd_type.facets, dict):
+                # Old format (dict)
+                for facet_name, facet_value in xsd_type.facets.items():
+                    if facet_name == 'enumeration':
+                        if isinstance(facet_value, list):
+                            enumeration_values.extend(facet_value)
+                        else:
+                            enumeration_values.append(facet_value)
+            elif isinstance(xsd_type.facets, list):
+                # New format (list of Facet objects)
+                for facet in xsd_type.facets:
+                    if hasattr(facet, 'name') and facet.name == 'enumeration':
+                        if isinstance(facet.value, list):
+                            enumeration_values.extend(facet.value)
+                        else:
+                            enumeration_values.append(facet.value)
+
+            if enumeration_values:
+                json_schema["type"] = "string"
+                json_schema["enum"] = enumeration_values
+                additional_properties = {}  # Enums don't have properties
+            else:
+                # Simple type without enums - fall through to other handling
+                json_schema["type"] = self._map_xsd_type_to_json_type(xsd_type)
+                additional_properties = {}
         # Handle inheritance with allOf pattern for extensions
-        if hasattr(xsd_type, 'base_type') and xsd_type.base_type and hasattr(xsd_type, 'derivation_method'):
+        elif hasattr(xsd_type, 'base_type') and xsd_type.base_type and hasattr(xsd_type, 'derivation_method'):
             if xsd_type.derivation_method and xsd_type.derivation_method.value == "extension":
                 # Use allOf for extensions to combine base type with extensions
                 json_schema["allOf"] = [
@@ -553,13 +606,20 @@ class Converter:
                 additional_properties = json_schema["properties"]
         else:
             # No inheritance - regular type
+            # Complex type or simple type without facets
             json_schema["type"] = "object" if hasattr(xsd_type, 'particle') or hasattr(xsd_type, 'attributes') else "string"
             additional_properties = json_schema["properties"]
 
         # Extract properties from particle (elements)
         if hasattr(xsd_type, 'particle') and xsd_type.particle:
-            particle_properties = self._extract_properties_from_particle(xsd_type.particle)
+            particle_properties, required_elements = self._extract_properties_from_particle(xsd_type.particle)
             additional_properties.update(particle_properties)
+
+            # Add required elements from particle (e.g., xs:all with minOccurs=1)
+            if required_elements:
+                if "required" not in json_schema:
+                    json_schema["required"] = []
+                json_schema["required"].extend(required_elements)
 
         # Add attributes as properties (only additional attributes for derived types)
         if hasattr(xsd_type, 'attributes'):

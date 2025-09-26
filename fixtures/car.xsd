@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://example.com/car"
+           xmlns:tns="http://example.com/car"
+           elementFormDefault="qualified">
+
+    <!-- Main car element -->
+    <xs:element name="car" type="tns:carType"/>
+
+    <!-- Car complex type with xs:all containing 4 required sub-elements -->
+    <xs:complexType name="carType">
+        <xs:annotation>
+            <xs:documentation>
+                A complete car structure with all major components.
+                Uses xs:all to ensure all parts are required but order-independent.
+            </xs:documentation>
+        </xs:annotation>
+        <xs:all minOccurs="1" maxOccurs="1">
+            <xs:element name="Engine" type="tns:engineType" minOccurs="1" maxOccurs="1"/>
+            <xs:element name="Body" type="tns:bodyType" minOccurs="1" maxOccurs="1"/>
+            <xs:element name="Tire" type="tns:tireType" minOccurs="1" maxOccurs="1"/>
+            <xs:element name="Electrical" type="tns:electricalType" minOccurs="1" maxOccurs="1"/>
+        </xs:all>
+        <xs:attribute name="vin" type="xs:string" use="required"/>
+        <xs:attribute name="year" type="xs:int" use="required"/>
+        <xs:attribute name="make" type="xs:string" use="required"/>
+        <xs:attribute name="model" type="xs:string" use="required"/>
+    </xs:complexType>
+
+    <!-- Engine complex type with 4 properties -->
+    <xs:complexType name="engineType">
+        <xs:annotation>
+            <xs:documentation>Engine specifications and components</xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="displacement" type="xs:decimal"/>
+            <xs:element name="cylinders" type="xs:int"/>
+            <xs:element name="fuelType" type="tns:fuelTypeEnum"/>
+            <xs:element name="horsepower" type="xs:int"/>
+        </xs:sequence>
+        <xs:attribute name="engineCode" type="xs:string" use="required"/>
+        <xs:attribute name="manufacturer" type="xs:string"/>
+    </xs:complexType>
+
+    <!-- Body complex type with 4 properties -->
+    <xs:complexType name="bodyType">
+        <xs:annotation>
+            <xs:documentation>Body structure and appearance details</xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="style" type="tns:bodyStyleEnum"/>
+            <xs:element name="color" type="xs:string"/>
+            <xs:element name="doors" type="xs:int"/>
+            <xs:element name="material" type="tns:materialEnum"/>
+        </xs:sequence>
+        <xs:attribute name="paintCode" type="xs:string"/>
+        <xs:attribute name="customized" type="xs:boolean" default="false"/>
+    </xs:complexType>
+
+    <!-- Tire complex type with 4 properties -->
+    <xs:complexType name="tireType">
+        <xs:annotation>
+            <xs:documentation>Tire specifications and details</xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="brand" type="xs:string"/>
+            <xs:element name="size" type="xs:string"/>
+            <xs:element name="pressure" type="xs:decimal"/>
+            <xs:element name="treadDepth" type="xs:decimal"/>
+        </xs:sequence>
+        <xs:attribute name="season" type="tns:seasonEnum" use="required"/>
+        <xs:attribute name="runFlat" type="xs:boolean" default="false"/>
+    </xs:complexType>
+
+    <!-- Electrical complex type with 4 properties -->
+    <xs:complexType name="electricalType">
+        <xs:annotation>
+            <xs:documentation>Electrical system components and specifications</xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="batteryVoltage" type="xs:decimal"/>
+            <xs:element name="alternatorOutput" type="xs:decimal"/>
+            <xs:element name="wiringHarness" type="xs:string"/>
+            <xs:element name="ecuVersion" type="xs:string"/>
+        </xs:sequence>
+        <xs:attribute name="systemType" type="tns:electricalSystemEnum" use="required"/>
+        <xs:attribute name="hybridCapable" type="xs:boolean" default="false"/>
+    </xs:complexType>
+
+    <!-- Supporting enumerations -->
+    <xs:simpleType name="fuelTypeEnum">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="gasoline"/>
+            <xs:enumeration value="diesel"/>
+            <xs:enumeration value="electric"/>
+            <xs:enumeration value="hybrid"/>
+            <xs:enumeration value="hydrogen"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="bodyStyleEnum">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="sedan"/>
+            <xs:enumeration value="coupe"/>
+            <xs:enumeration value="hatchback"/>
+            <xs:enumeration value="suv"/>
+            <xs:enumeration value="truck"/>
+            <xs:enumeration value="convertible"/>
+            <xs:enumeration value="wagon"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="materialEnum">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="steel"/>
+            <xs:enumeration value="aluminum"/>
+            <xs:enumeration value="carbon-fiber"/>
+            <xs:enumeration value="composite"/>
+            <xs:enumeration value="fiberglass"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="seasonEnum">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="all-season"/>
+            <xs:enumeration value="summer"/>
+            <xs:enumeration value="winter"/>
+            <xs:enumeration value="performance"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="electricalSystemEnum">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="12V"/>
+            <xs:enumeration value="24V"/>
+            <xs:enumeration value="hybrid"/>
+            <xs:enumeration value="high-voltage"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+</xs:schema>

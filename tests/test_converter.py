@@ -9,6 +9,7 @@ import pytest
 from src.xsd2json.converter import Converter, ConversionResult
 from src.xsd2json.config import Config, OutputMode
 from src.xsd2json.schema_model import Schema, ComplexType, SimpleType, Element
+from src.xsd2json.logger import LogLevel
 
 
 class TestConversionResult:
@@ -488,3 +489,278 @@ class TestConverter:
         extended_props = extended_type["allOf"][1]["properties"]
         assert "@priority" in extended_props
         assert "@version" not in extended_props  # Should not duplicate base attributes
+
+    def test_convert_car_xsd_single_mode(self, car_xsd_file, temp_dir):
+        """Test converting complex Car XSD in single file mode."""
+        config = Config(
+            input_file=car_xsd_file,
+            output_dir=temp_dir / "output",
+            output_mode=OutputMode.SINGLE
+        )
+        converter = Converter(config)
+
+        result = converter.convert()
+
+        assert result.success
+        assert len(result.output_files) == 1
+        assert result.processing_time > 0
+
+        # Check output file exists
+        output_file = result.output_files[0]
+        assert output_file.exists()
+        assert output_file.suffix == ".json"
+
+        # Read and validate JSON content
+        with open(output_file, 'r', encoding='utf-8') as f:
+            json_content = json.load(f)
+
+        assert json_content["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+        assert "definitions" in json_content
+
+        # Verify all main types are present
+        definitions = json_content["definitions"]
+        assert "carType" in definitions
+        assert "engineType" in definitions
+        assert "bodyType" in definitions
+        assert "tireType" in definitions
+        assert "electricalType" in definitions
+
+        # Verify enums are present
+        assert "fuelTypeEnum" in definitions
+        assert "bodyStyleEnum" in definitions
+        assert "materialEnum" in definitions
+        assert "seasonEnum" in definitions
+        assert "electricalSystemEnum" in definitions
+
+    def test_convert_car_xsd_structure_depth(self, car_xsd_file, temp_dir):
+        """Test that Car XSD conversion preserves structure depth."""
+        config = Config(
+            input_file=car_xsd_file,
+            output_dir=temp_dir / "output",
+            output_mode=OutputMode.SINGLE
+        )
+        converter = Converter(config)
+
+        result = converter.convert()
+        assert result.success
+
+        with open(result.output_files[0], 'r', encoding='utf-8') as f:
+            json_content = json.load(f)
+
+        # Verify carType structure
+        car_type = json_content["definitions"]["carType"]
+        assert car_type["type"] == "object"
+        assert "properties" in car_type
+
+        # Verify all 4 main components are properties of carType
+        car_properties = car_type["properties"]
+        assert "Engine" in car_properties
+        assert "Body" in car_properties
+        assert "Tire" in car_properties
+        assert "Electrical" in car_properties
+
+        # Verify car attributes are preserved
+        assert "@vin" in car_properties
+        assert "@year" in car_properties
+        assert "@make" in car_properties
+        assert "@model" in car_properties
+
+        # Verify Engine type has 4 properties plus attributes
+        engine_type = json_content["definitions"]["engineType"]
+        engine_props = engine_type["properties"]
+        assert "displacement" in engine_props
+        assert "cylinders" in engine_props
+        assert "fuelType" in engine_props
+        assert "horsepower" in engine_props
+        assert "@engineCode" in engine_props
+        assert "@manufacturer" in engine_props
+
+        # Verify Body type has 4 properties plus attributes
+        body_type = json_content["definitions"]["bodyType"]
+        body_props = body_type["properties"]
+        assert "style" in body_props
+        assert "color" in body_props
+        assert "doors" in body_props
+        assert "material" in body_props
+        assert "@paintCode" in body_props
+        assert "@customized" in body_props
+
+        # Verify Tire type has 4 properties plus attributes
+        tire_type = json_content["definitions"]["tireType"]
+        tire_props = tire_type["properties"]
+        assert "brand" in tire_props
+        assert "size" in tire_props
+        assert "pressure" in tire_props
+        assert "treadDepth" in tire_props
+        assert "@season" in tire_props
+        assert "@runFlat" in tire_props
+
+        # Verify Electrical type has 4 properties plus attributes
+        electrical_type = json_content["definitions"]["electricalType"]
+        electrical_props = electrical_type["properties"]
+        assert "batteryVoltage" in electrical_props
+        assert "alternatorOutput" in electrical_props
+        assert "wiringHarness" in electrical_props
+        assert "ecuVersion" in electrical_props
+        assert "@systemType" in electrical_props
+        assert "@hybridCapable" in electrical_props
+
+        # Verify xs:all is handled correctly (all elements and required attributes)
+        expected_required = ["Engine", "Body", "Tire", "Electrical", "@vin", "@year", "@make", "@model"]
+        assert set(car_type["required"]) == set(expected_required)
+
+    def test_convert_car_xsd_multi_mode(self, car_xsd_file, temp_dir):
+        """Test converting complex Car XSD in multi-file mode."""
+        config = Config(
+            input_file=car_xsd_file,
+            output_dir=temp_dir / "output",
+            output_mode=OutputMode.MULTI
+        )
+        converter = Converter(config)
+
+        result = converter.convert()
+
+        assert result.success
+        assert len(result.output_files) >= 6  # Master + 5 types + README minimum
+        assert result.processing_time > 0
+
+        # Check that master schema file exists
+        master_file = temp_dir / "output" / "schema.json"
+        assert master_file.exists()
+
+        # Check that types directory exists
+        types_dir = temp_dir / "output" / "types"
+        assert types_dir.exists()
+
+        # Check that README exists
+        readme_file = temp_dir / "output" / "README.md"
+        assert readme_file.exists()
+
+        # Validate master schema content
+        with open(master_file, 'r', encoding='utf-8') as f:
+            master_content = json.load(f)
+
+        assert master_content["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+        assert "properties" in master_content
+
+        # Verify all main types are referenced in master
+        master_props = master_content["properties"]
+        assert "carType" in master_props
+        assert "engineType" in master_props
+        assert "bodyType" in master_props
+        assert "tireType" in master_props
+        assert "electricalType" in master_props
+
+        # Verify individual type files exist
+        car_type_file = types_dir / "car-type.json"
+        engine_type_file = types_dir / "engine-type.json"
+        body_type_file = types_dir / "body-type.json"
+        tire_type_file = types_dir / "tire-type.json"
+        electrical_type_file = types_dir / "electrical-type.json"
+
+        assert car_type_file.exists()
+        assert engine_type_file.exists()
+        assert body_type_file.exists()
+        assert tire_type_file.exists()
+        assert electrical_type_file.exists()
+
+        # Validate individual type file has correct structure depth
+        with open(car_type_file, 'r', encoding='utf-8') as f:
+            car_content = json.load(f)
+
+        assert car_content["type"] == "object"
+        assert "properties" in car_content
+        car_props = car_content["properties"]
+
+        # Verify all 4 main components are preserved in individual file
+        assert "Engine" in car_props
+        assert "Body" in car_props
+        assert "Tire" in car_props
+        assert "Electrical" in car_props
+
+    def test_car_xsd_enum_handling(self, car_xsd_file, temp_dir):
+        """Test that Car XSD enumerations are correctly handled."""
+        config = Config(
+            input_file=car_xsd_file,
+            output_dir=temp_dir / "output",
+            output_mode=OutputMode.SINGLE
+        )
+        converter = Converter(config)
+
+        result = converter.convert()
+        assert result.success
+
+        with open(result.output_files[0], 'r', encoding='utf-8') as f:
+            json_content = json.load(f)
+
+        definitions = json_content["definitions"]
+
+        # Verify fuel type enum
+        fuel_type_enum = definitions["fuelTypeEnum"]
+        assert "enum" in fuel_type_enum
+        fuel_values = fuel_type_enum["enum"]
+        assert "gasoline" in fuel_values
+        assert "diesel" in fuel_values
+        assert "electric" in fuel_values
+        assert "hybrid" in fuel_values
+        assert "hydrogen" in fuel_values
+
+        # Verify body style enum
+        body_style_enum = definitions["bodyStyleEnum"]
+        assert "enum" in body_style_enum
+        body_values = body_style_enum["enum"]
+        assert "sedan" in body_values
+        assert "coupe" in body_values
+        assert "suv" in body_values
+        assert "truck" in body_values
+
+        # Verify season enum
+        season_enum = definitions["seasonEnum"]
+        assert "enum" in season_enum
+        season_values = season_enum["enum"]
+        assert "all-season" in season_values
+        assert "summer" in season_values
+        assert "winter" in season_values
+        assert "performance" in season_values
+
+    def test_car_xsd_annotations_preserved(self, car_xsd_file, temp_dir):
+        """Test that Car XSD annotations are preserved in JSON output."""
+        config = Config(
+            input_file=car_xsd_file,
+            output_dir=temp_dir / "output",
+            output_mode=OutputMode.SINGLE
+        )
+        converter = Converter(config)
+
+        result = converter.convert()
+        assert result.success
+
+        with open(result.output_files[0], 'r', encoding='utf-8') as f:
+            json_content = json.load(f)
+
+        definitions = json_content["definitions"]
+
+        # Verify carType has description from annotation
+        car_type = definitions["carType"]
+        assert "description" in car_type
+        assert "A complete car structure" in car_type["description"]
+
+        # Verify engineType has description
+        engine_type = definitions["engineType"]
+        assert "description" in engine_type
+        assert "Engine specifications" in engine_type["description"]
+
+        # Verify bodyType has description
+        body_type = definitions["bodyType"]
+        assert "description" in body_type
+        assert "Body structure" in body_type["description"]
+
+        # Verify tireType has description
+        tire_type = definitions["tireType"]
+        assert "description" in tire_type
+        assert "Tire specifications" in tire_type["description"]
+
+        # Verify electricalType has description
+        electrical_type = definitions["electricalType"]
+        assert "description" in electrical_type
+        assert "Electrical system" in electrical_type["description"]

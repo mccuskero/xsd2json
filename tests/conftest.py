@@ -118,3 +118,10 @@ def complex_xsd_file(temp_dir: Path, complex_xsd_content: str) -> Path:
     xsd_file = temp_dir / "complex.xsd"
     xsd_file.write_text(complex_xsd_content, encoding='utf-8')
     return xsd_file
+
+
+@pytest.fixture
+def car_xsd_file() -> Path:
+    """Path to the Car.xsd fixture file."""
+    fixtures_dir = Path(__file__).parent.parent / "fixtures"
+    return fixtures_dir / "car.xsd"

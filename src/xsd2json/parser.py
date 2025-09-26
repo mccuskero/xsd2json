@@ -154,7 +154,11 @@ class XSDParser:
             # Convert facets
             if hasattr(xsd_simple_type, 'facets'):
                 for facet_name, facet_obj in xsd_simple_type.facets.items():
-                    if hasattr(facet_obj, 'value'):
+                    # Handle enumeration facets specially
+                    if 'enumeration' in facet_name.lower() and hasattr(facet_obj, 'enumeration'):
+                        # XsdEnumerationFacets stores the actual values in the 'enumeration' attribute
+                        simple_type.add_facet('enumeration', facet_obj.enumeration)
+                    elif hasattr(facet_obj, 'value') and facet_obj.value is not None:
                         simple_type.add_facet(facet_name, facet_obj.value)
 
             # Handle union types
@@ -176,10 +180,12 @@ class XSDParser:
             return simple_type
 
         except Exception as e:
+            import traceback
             self.logger.error(
                 "Error converting simple type",
                 typeName=getattr(xsd_simple_type, 'name', 'unknown'),
-                error=str(e)
+                error=str(e),
+                traceback=traceback.format_exc()
             )
             return None
 
@@ -282,6 +288,13 @@ class XSDParser:
             # Set occurrence
             min_occurs = getattr(xsd_element, 'min_occurs', 1)
             max_occurs = getattr(xsd_element, 'max_occurs', 1)
+
+            # Handle None values (use defaults)
+            if min_occurs is None:
+                min_occurs = 1
+            if max_occurs is None:
+                max_occurs = 1
+
             element.occurs = ElementOccurrence(min_occurs, max_occurs)
 
             # Set basic properties
@@ -329,6 +342,15 @@ class XSDParser:
             elif 'All' in particle_type:
                 return self._convert_all(xsd_particle)
             elif 'Group' in particle_type:
+                # Check if this is an XsdGroup with a specific model (all, sequence, choice)
+                if hasattr(xsd_particle, 'model'):
+                    if xsd_particle.model == 'all':
+                        return self._convert_all(xsd_particle)
+                    elif xsd_particle.model == 'sequence':
+                        return self._convert_sequence(xsd_particle)
+                    elif xsd_particle.model == 'choice':
+                        return self._convert_choice(xsd_particle)
+                # Fallback to group reference
                 return self._convert_group_reference(xsd_particle)
             elif 'Any' in particle_type:
                 return self._convert_any(xsd_particle)
