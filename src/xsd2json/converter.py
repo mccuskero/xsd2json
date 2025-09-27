@@ -214,7 +214,7 @@ class Converter:
         if hasattr(element, 'type') and element.type:
             if hasattr(element.type, 'name'):
                 # Reference to a named type
-                element_schema["$ref"] = f"#/definitions/{element.type.name}"
+                element_schema["$ref"] = f"#/$defs/{element.type.name}"
             else:
                 # Inline type - map to JSON type
                 element_schema["type"] = self._map_xsd_type_to_json_type(element.type)
@@ -238,9 +238,13 @@ class Converter:
                 # Element is optional - this would be handled in the required array
                 pass
 
-        # Add description
-        if hasattr(element, 'annotation') and element.annotation and element.annotation.documentation:
-            element_schema["description"] = " ".join(element.annotation.documentation)
+        # Add description if flag is enabled
+        if self.config.add_description_field:
+            if hasattr(element, 'annotation') and element.annotation and element.annotation.documentation:
+                element_schema["description"] = " ".join(element.annotation.documentation)
+            elif hasattr(element, 'name'):
+                # Add a default description if no annotation is available
+                element_schema["description"] = f"Element: {element.name}"
 
         return element_schema
 
@@ -321,8 +325,8 @@ class Converter:
             # If only one schema, write it directly
             consolidated_schema = json_schemas[0]
         else:
-            # Create a consolidated schema with definitions for multiple schemas
-            definitions = {}
+            # Create a consolidated schema with $defs for multiple schemas
+            defs = {}
             properties = {}
 
             for schema in json_schemas:
@@ -335,11 +339,11 @@ class Converter:
                 else:
                     schema_name = title.replace(" ", "").replace("Generated JSON Schema for ", "")
 
-                # Add to definitions
-                definitions[schema_name] = {k: v for k, v in schema.items() if k != "$id"}
+                # Add to $defs
+                defs[schema_name] = {k: v for k, v in schema.items() if k != "$id"}
 
                 # Add reference in properties
-                properties[schema_name] = {"$ref": f"#/definitions/{schema_name}"}
+                properties[schema_name] = {"$ref": f"#/$defs/{schema_name}"}
 
             consolidated_schema = {
                 "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -347,7 +351,7 @@ class Converter:
                 "title": "Consolidated JSON Schema",
                 "type": "object",
                 "properties": properties,
-                "definitions": definitions
+                "$defs": defs
             }
 
         with open(output_file, 'w', encoding='utf-8') as f:
@@ -581,7 +585,7 @@ class Converter:
             if xsd_type.derivation_method and xsd_type.derivation_method.value == "extension":
                 # Use allOf for extensions to combine base type with extensions
                 json_schema["allOf"] = [
-                    {"$ref": f"#/definitions/{xsd_type.base_type.name}"},
+                    {"$ref": f"#/$defs/{xsd_type.base_type.name}"},
                     {
                         "type": "object",
                         "properties": {}
@@ -634,10 +638,18 @@ class Converter:
                     continue
 
                 attr_name = f"@{attr.name}" if self.config.attr_style.value == "prefix" else attr.name
-                additional_properties[attr_name] = {
-                    "type": self._map_xsd_type_to_json_type(attr.type if attr.type else None),
-                    "description": " ".join(attr.annotation.documentation) if attr.annotation.documentation else f"Attribute: {attr.name}"
+                attr_schema = {
+                    "type": self._map_xsd_type_to_json_type(attr.type if attr.type else None)
                 }
+
+                # Add description if flag is enabled
+                if self.config.add_description_field:
+                    if attr.annotation and attr.annotation.documentation:
+                        attr_schema["description"] = " ".join(attr.annotation.documentation)
+                    else:
+                        attr_schema["description"] = f"Attribute: {attr.name}"
+
+                additional_properties[attr_name] = attr_schema
 
                 # Add required attributes to schema
                 if attr.use and attr.use.value == "required":

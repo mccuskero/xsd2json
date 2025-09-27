@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+import click
 from click.testing import CliRunner
 
 from src.xsd2json.cli import main, validate_input_file
@@ -24,7 +25,7 @@ class TestValidateInputFile:
         runner = CliRunner()
         nonexistent_file = str(temp_dir / "nonexistent.xsd")
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(click.BadParameter):
             with runner.isolated_filesystem():
                 validate_input_file(None, None, nonexistent_file)
 
@@ -35,7 +36,7 @@ class TestValidateInputFile:
 
         runner = CliRunner()
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(click.BadParameter):
             validate_input_file(None, None, str(wrong_file))
 
     def test_validate_input_file_valid_xsd(self, simple_xsd_file):
@@ -209,7 +210,7 @@ class TestCLIMain:
             assert call_args.llm.natural_naming
             assert call_args.llm.embed_docs
 
-    def test_cli_config_validation_errors(self, temp_dir):
+    def test_cli_config_validation_errors(self, temp_dir, simple_xsd_file):
         """Test CLI with configuration validation errors."""
         # Create XSD file in non-existent parent directory structure
         invalid_output_dir = temp_dir / "nonexistent" / "deeply" / "nested" / "output"
@@ -217,15 +218,18 @@ class TestCLIMain:
         with patch('src.xsd2json.cli.Config') as mock_config_class:
             mock_config = Mock()
             mock_config.validate.return_value = ["Configuration error"]
+            # Add required attributes for the logger
+            mock_config.logging = Mock()
+            mock_config.logging.level = LogLevel.INFO
 
             mock_config_class.from_cli_args.return_value = mock_config
 
             result = self.runner.invoke(main, [
-                '--input', 'test.xsd',
+                '--input', str(simple_xsd_file),
                 '--output', str(invalid_output_dir)
             ])
 
-            assert result.exit_code == 1
+            assert result.exit_code == 1  # Config validation error
             assert "Configuration error" in result.output
 
     @patch('src.xsd2json.cli.Converter')

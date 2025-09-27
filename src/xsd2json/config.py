@@ -83,6 +83,7 @@ class Config:
     max_recursion_depth: int = 50
     cache_schemas: bool = True
     parallel_processing: bool = True
+    add_description_field: bool = False  # Add description field to properties
 
     def enable_all_llm_optimizations(self) -> None:
         """Enable all LLM optimization flags."""
@@ -138,5 +139,9 @@ class Config:
         # Handle logging level
         if "log_level" in kwargs:
             config.logging.level = LogLevel(kwargs["log_level"])
+
+        # Handle serializer pretty flag
+        if "pretty" in kwargs:
+            config.serializer.pretty = kwargs["pretty"]
 
         return config

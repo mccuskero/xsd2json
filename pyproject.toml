@@ -3,9 +3,6 @@ name = "xsd2json"
 version = "0.1.0"
 description = "Robust XSD to JSON Schema converter with LLM optimization features"
 readme = "README.md"
-authors = [
-    { name = "Owen McCusker", email = "mccuskerowen@gmail.com" }
-]
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.1.0",

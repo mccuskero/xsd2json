@@ -92,6 +92,11 @@ def validate_input_file(ctx, param, value):
     default=True,
     help="Pretty-print JSON output (default: pretty)"
 )
+@click.option(
+    "--add-description-field",
+    is_flag=True,
+    help="Add description field to properties within defined types"
+)
 def main(
     input: Path,
     output: Optional[Path],
@@ -105,6 +110,7 @@ def main(
     embed_docs: bool,
     diagnose: bool,
     pretty: bool,
+    add_description_field: bool,
 ) -> None:
     """Convert XSD schema files to JSON Schema with LLM optimization features.
 
@@ -136,6 +142,7 @@ def main(
         embed_docs=embed_docs,
         diagnose=diagnose,
         pretty=pretty,
+        add_description_field=add_description_field,
     )
 
     # Enable all LLM optimizations if --llm-optimized flag is used

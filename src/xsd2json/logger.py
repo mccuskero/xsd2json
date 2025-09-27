@@ -30,14 +30,30 @@ class StructuredFormatter(logging.Formatter):
         }
 
         # Add optional fields if present
-        optional_fields = ["schema", "operationId", "sourceURI", "line", "col", "errorCode"]
+        optional_fields = ["schema", "operationId", "sourceURI", "line", "col", "errorCode",
+                          "metricName", "value", "unit", "event", "xsdConstruct", "jsonOutput",
+                          "progressStep", "totalSteps", "currentStep", "xsdElement", "mappingReason"]
         for field in optional_fields:
             if hasattr(record, field):
                 log_entry[field] = getattr(record, field)
 
-        # Add extra fields from record
-        if hasattr(record, "extra") and isinstance(record.extra, dict):
+        # Handle manually set extra field (for backwards compatibility)
+        if hasattr(record, 'extra') and isinstance(record.extra, dict):
             log_entry.update(record.extra)
+
+        # Add any other extra fields from record (those not in standard logging fields)
+        standard_fields = {
+            'name', 'msg', 'args', 'levelname', 'levelno', 'pathname', 'filename',
+            'module', 'exc_info', 'exc_text', 'stack_info', 'lineno', 'funcName',
+            'created', 'msecs', 'relativeCreated', 'thread', 'threadName',
+            'processName', 'process', 'getMessage', 'extra'
+        }
+        for attr_name in dir(record):
+            if (not attr_name.startswith('_') and
+                attr_name not in standard_fields and
+                attr_name not in log_entry and
+                not callable(getattr(record, attr_name))):
+                log_entry[attr_name] = getattr(record, attr_name)
 
         return json.dumps(log_entry, default=str)
 

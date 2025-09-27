@@ -186,6 +186,8 @@ class TestXSDParser:
         mock_element.default = None
         mock_element.fixed = None
         mock_element.type = None
+        mock_element.target_namespace = None
+        mock_element.annotation = None
 
         element = parser._convert_element(mock_element)
 
@@ -206,6 +208,8 @@ class TestXSDParser:
         mock_simple_type.name = None
         mock_simple_type.primitive_type = None
         mock_simple_type.base_type = None
+        mock_simple_type.target_namespace = None
+        mock_simple_type.annotation = None
 
         # Mock facets
         mock_facet1 = Mock()
@@ -217,6 +221,8 @@ class TestXSDParser:
             "maxLength": mock_facet1,
             "pattern": mock_facet2
         }
+        mock_simple_type.member_types = []  # Empty list for union types
+        mock_simple_type.variety = "atomic"  # atomic, list, or union
 
         simple_type = parser._convert_simple_type(mock_simple_type)
 
